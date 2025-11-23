@@ -446,7 +446,11 @@ function evalCall(instr: bril.Operation, state: State): Action {
  * otherwise, return "next" to indicate that we should proceed to the next
  * instruction or "end" to terminate the function.
  */
-function evalInstr(instr: bril.Instruction, state: State): Action {
+function evalInstr(instr: bril.Instruction, state: State, isMain: Boolean): Action {  
+  if (isMain) {
+    console.log(JSON.stringify(instr));
+  }
+
   state.icount += BigInt(1);
 
   // Check that we have the right number of arguments.
@@ -830,11 +834,28 @@ function evalInstr(instr: bril.Instruction, state: State): Action {
 }
 
 function evalFunc(func: bril.Function, state: State): Value | null {
+  const isMain = func.name == "main";
+  const visitedLabels = new Set<string>();
+  let isTracing = isMain;
+
   for (let i = 0; i < func.instrs.length; ++i) {
     const line = func.instrs[i];
+
+    // Track labels we've seen
+    if ("label" in line && isTracing) {
+      if (visitedLabels.has(line.label)) {
+        // We've seen this label before - this is a backedge!
+        isTracing = false;
+      } else {
+        visitedLabels.add(line.label);
+      }
+    }
+
     if ("op" in line) {
+      // start tracing if the function is main
+      
       // Run an instruction.
-      const action = evalInstr(line, state);
+      const action = evalInstr(line, state, isMain);
 
       // Take the prescribed action.
       switch (action.action) {
